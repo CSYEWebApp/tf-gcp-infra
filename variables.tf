@@ -8,16 +8,16 @@ variable "region" {
   type        = string
 }
 
-variable "vpcs" {
-  description = "List of VPC configurations"
-  type        = list(object({
-    vpc_name              = string
-    webapp_subnet         = string
-    db_subnet             = string
-    internet_gateway_name = string
-    privateipgoogleaccess = bool
-  }))
-}
+#variable "vpcs" {
+#  description = "List of VPC configurations"
+#  type        = list(object({
+#    vpc_name              = string
+#    webapp_subnet         = string
+#    db_subnet             = string
+#    internet_gateway_name = string
+#    privateipgoogleaccess = bool
+#  }))
+#}
 
 variable "application_port" {
   description = "The port on which the application listens"
@@ -49,12 +49,12 @@ variable "zone" {
   type        = string
 }
 
-variable  "nexthopgateway" {
+variable "nexthopgateway" {
   description = "To set next hop gateway value"
   type        = string
 }
 
-variable "machine_type"{
+variable "machine_type" {
   description = "The machine type for the instance"
   type        = string
 }
@@ -64,3 +64,112 @@ variable "dest_range" {
   type        = string
 }
 
+variable "vpc_name" {
+  description = "The VPC Name"
+  type        = string
+}
+variable "webapp_subnet" {
+  description = "Webapp subnet cidr"
+  type        = string
+}
+variable "db_subnet" {
+  description = "db subnet cidr"
+  type        = string
+}
+variable "internet_gateway_name" {
+  description = "internet gateway"
+  type        = string
+}
+variable "privateipgoogleaccess" {
+  description = "privateipgoogleaccess"
+  type        = string
+}
+
+variable "sqlinstancename" {
+  description = "gcloud sql instance name"
+  type        = string
+}
+variable "database_version" {
+  description = "databse version"
+  type        = string
+
+}
+
+variable "tier" {
+  description = "tier"
+  type        = string
+
+}
+
+variable "availability_type" {
+  description = "availability type"
+  type        = string
+
+}
+variable "dbdisk_type" {
+  description = "instance disk type"
+  type        = string
+
+}
+variable "dbdisk_size" {
+  description = "Database disk size"
+  type        = number
+
+}
+variable "cloudsql_database_name" {
+  description = "databse name"
+  type        = string
+
+}
+variable "sql_user" {
+  description = "sql user name"
+  type        = string
+
+}
+variable "private_ip_address_name" {
+  description = "private ip address name"
+  type        = string
+
+}
+variable "ip_purpose" {
+  description = "VPC purpose"
+  type        = string
+
+}
+variable "ip_address_type" {
+  description = "private ip address"
+  type        = string
+}
+
+variable "username" {
+  description = "SQL username"
+  type = string
+}
+variable "dbname" {
+  description = "Database name"
+  type = string
+}
+variable "deletion_protection" {
+  description = "Deletion protection"
+  type = bool
+}
+variable "ipv4_enabled" {
+  description = "ipv4"
+  type = bool
+}
+variable "binary_log_enabled" {
+  description = "binary log enabled"
+  type = bool
+}
+variable "backup_configuration_enabled" {
+  description = "backup configuration for mySQL"
+  type = bool
+}
+variable "delete_default_routes_on_create" {
+  description = "delete default routes on create"
+  type=bool
+}
+variable "auto_create_subnetworks" {
+  description = "auto create subnetworks"
+  type = bool
+}
