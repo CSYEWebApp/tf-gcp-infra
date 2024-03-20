@@ -173,3 +173,31 @@ variable "auto_create_subnetworks" {
   description = "auto create subnetworks"
   type = bool
 }
+variable "record_type" {
+  description = "The type of DNS record (e.g., A, CNAME, TXT)"
+  type        = string
+}
+variable "ttl" {
+  description = "Time to live (TTL) for the DNS record"
+  type        = number
+}
+variable "logging_admin_role" {
+  description = "IAM role assigned to member"
+  type = string
+}
+variable "metric_writer_role" {
+  description = "IAM role assigned to member"
+  type = string
+}
+variable "zone_name" {
+  description = "The name of the existing DNS managed zone"
+  type        = string
+}
+variable "service_account_account_id" {
+  description = "The desired account ID for the service account"
+  type        = string
+}
+variable "service_account_display_name" {
+  description = "The desired display name for the service account"
+  type        = string
+}
