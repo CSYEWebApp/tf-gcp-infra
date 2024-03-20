@@ -123,6 +123,11 @@ resource "random_password" "cloudsql_password" {
   special = true
 }
 
+resource "google_service_account" "service_account" {
+  account_id   = var.service_account_account_id
+  display_name = var.service_account_display_name
+}
+
 resource "google_compute_instance" "webapp_instance" {
   name         = "${var.vpc_name}-webapp-instance"
   machine_type = var.machine_type
@@ -155,5 +160,42 @@ resource "google_compute_instance" "webapp_instance" {
       echo "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect" >> /opt/csye6225/application.properties
       echo "spring.jackson.deserialization.fail-on-unknown-properties=true" >> /opt/csye6225/application.properties
   EOF
+
+  depends_on = [google_service_account.service_account]
+
+  service_account {
+    email  = google_service_account.service_account.email
+    scopes = ["cloud-platform"]
+  }
+  allow_stopping_for_update = true
 }
 
+data "google_dns_managed_zone" "existing_zone" {
+  name = var.zone_name
+}
+
+resource "google_dns_record_set" "a" {
+  name         = data.google_dns_managed_zone.existing_zone.dns_name
+  managed_zone = data.google_dns_managed_zone.existing_zone.name
+  type         = var.record_type
+  ttl          = var.ttl
+  rrdatas = [google_compute_instance.webapp_instance.network_interface[0].access_config[0].nat_ip]
+}
+
+resource "google_project_iam_binding" "logging_admin_binding" {
+  project = var.project_id
+  role    = var.logging_admin_role
+
+  members = [
+    "serviceAccount:${google_service_account.service_account.email}"
+  ]
+}
+
+resource "google_project_iam_binding" "monitoring_metric_writer_binding" {
+  project = var.project_id
+  role    = var.metric_writer_role
+
+  members = [
+    "serviceAccount:${google_service_account.service_account.email}"
+  ]
+}
