@@ -143,35 +143,35 @@ variable "ip_address_type" {
 
 variable "username" {
   description = "SQL username"
-  type = string
+  type        = string
 }
 variable "dbname" {
   description = "Database name"
-  type = string
+  type        = string
 }
 variable "deletion_protection" {
   description = "Deletion protection"
-  type = bool
+  type        = bool
 }
 variable "ipv4_enabled" {
   description = "ipv4"
-  type = bool
+  type        = bool
 }
 variable "binary_log_enabled" {
   description = "binary log enabled"
-  type = bool
+  type        = bool
 }
 variable "backup_configuration_enabled" {
   description = "backup configuration for mySQL"
-  type = bool
+  type        = bool
 }
 variable "delete_default_routes_on_create" {
   description = "delete default routes on create"
-  type=bool
+  type        = bool
 }
 variable "auto_create_subnetworks" {
   description = "auto create subnetworks"
-  type = bool
+  type        = bool
 }
 variable "record_type" {
   description = "The type of DNS record (e.g., A, CNAME, TXT)"
@@ -183,11 +183,11 @@ variable "ttl" {
 }
 variable "logging_admin_role" {
   description = "IAM role assigned to member"
-  type = string
+  type        = string
 }
 variable "metric_writer_role" {
   description = "IAM role assigned to member"
-  type = string
+  type        = string
 }
 variable "zone_name" {
   description = "The name of the existing DNS managed zone"
@@ -200,4 +200,9 @@ variable "service_account_account_id" {
 variable "service_account_display_name" {
   description = "The desired display name for the service account"
   type        = string
+}
+variable "scopes" {
+  description = "List of scopes for the service account"
+  type        = list(string)
+  #  default     = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write"]
 }
