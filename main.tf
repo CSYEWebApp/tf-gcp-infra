@@ -160,7 +160,7 @@ resource "google_compute_instance" "webapp_instance" {
       echo "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect" >> /opt/csye6225/application.properties
       echo "spring.jackson.deserialization.fail-on-unknown-properties=true" >> /opt/csye6225/application.properties
       echo "projectId=dev-csye-6225-415001" >> /opt/csye6225/application.properties
-      echo "topicId=pub-topic >>/opt/csye6225/application.properties
+      echo "topicId=verify_email >>/opt/csye6225/application.properties
   EOF
 
   depends_on = [google_service_account.service_account]
@@ -209,31 +209,30 @@ resource "google_pubsub_topic" "pubtopic" {
 }
 
 resource "google_pubsub_subscription" "pusub" {
-  name  = "pubsub-subscription"
-  topic = google_pubsub_topic.pubtopic.id
+  name                 = "pubsub-subscription"
+  topic                = google_pubsub_topic.pubtopic.id
   ack_deadline_seconds = 20
 }
 resource "google_storage_bucket" "cloud_bucket" {
-  name     = "abcxyz7686"
-  location = "US"
+  name                        = "abcxyz7686"
+  location                    = "US"
   uniform_bucket_level_access = false
 }
 
 resource "google_storage_bucket_object" "archive" {
   name   = "function.jar"
   bucket = google_storage_bucket.cloud_bucket.name
-  source = "/Users/vamsidhar/Documents/CloudFunctionSource/function-source.zip"
-
+  source = "/Users/vamsidhar/Documents/serverless1/function-source.zip"
 }
 
 resource "google_cloudfunctions2_function" "cloud_function" {
-  name = "cloudfunction"
-  location = var.region
+  name        = "cloudfunction"
+  location    = var.region
   description = "abcd"
 
   depends_on = [google_vpc_access_connector.serverlessvpc, google_sql_database_instance.sql_instance]
   build_config {
-    runtime = "java17"
+    runtime     = "java17"
     entry_point = "gcfv2pubsub.PubSubFunction"
 
     source {
@@ -245,20 +244,22 @@ resource "google_cloudfunctions2_function" "cloud_function" {
   }
 
   service_config {
-    min_instance_count = 0
-    max_instance_count = 1
-    available_memory = "2Gi"
+    min_instance_count               = 0
+    max_instance_count               = 1
+    available_memory                 = "2Gi"
     max_instance_request_concurrency = 10
-    available_cpu = "2"
-    service_account_email = google_service_account.cloudfunction_service.email
+    available_cpu                    = "2"
+    service_account_email            = google_service_account.cloudfunction_service.email
     environment_variables = {
-      db_ip ="${google_sql_database_instance.sql_instance.private_ip_address}"
-      password ="${random_password.cloudsql_password.result}"
-      mailgun_email = "postmaster@csye6225cloud.me"
-      api_key = "5b3158fa7599ba7c4c4d36863c382484-f68a26c9-6574ecb1"
+      dbUrl = "jdbc:mysql://${google_sql_database_instance.sql_instance.private_ip_address}:3306/webapp?createDatabaseIfNotExist=true"
+      #      db_ip ="${google_sql_database_instance.sql_instance.private_ip_address}"
+      dbName        = google_sql_database.cloudsql_database.name
+      dbPass        = random_password.cloudsql_password.result
+      mailgun_email = var.mailgun_email
+      api_key       = var.api_key
     }
 
-    vpc_connector = "projects/${var.project_id}/locations/${var.region}/connectors/${google_vpc_access_connector.serverlessvpc.name}"
+    vpc_connector                 = "projects/${var.project_id}/locations/${var.region}/connectors/${google_vpc_access_connector.serverlessvpc.name}"
     vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
 
   }
@@ -266,30 +267,30 @@ resource "google_cloudfunctions2_function" "cloud_function" {
   event_trigger {
 
     trigger_region = var.region
-    event_type = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic = google_pubsub_topic.pubtopic.id
-    retry_policy = "RETRY_POLICY_DO_NOT_RETRY"
+    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic   = google_pubsub_topic.pubtopic.id
+    retry_policy   = "RETRY_POLICY_DO_NOT_RETRY"
   }
 }
 
 resource "google_vpc_access_connector" "serverlessvpc" {
-  project = var.project_id
-  name = "vpcconnectorx"
-  region = var.region
-  network = google_compute_network.vpc_network.name
+  project       = var.project_id
+  name          = "vpcconnectorx"
+  region        = var.region
+  network       = google_compute_network.vpc_network.name
   ip_cidr_range = "10.0.8.0/28"
 }
 
 
 resource "google_service_account" "cloudfunction_service" {
-  account_id = "cloud-sa"
+  account_id   = "cloud-sa"
   display_name = "cloud service account"
 }
 
 resource "google_pubsub_topic_iam_binding" "pubsub_binding" {
   project = var.project_id
-  role    = "roles/pubsub.publisher"  # or any other suitable Pub/Sub role
-  topic = google_pubsub_topic.pubtopic.name
+  role    = "roles/pubsub.publisher"
+  topic   = google_pubsub_topic.pubtopic.name
   members = [
     "serviceAccount:${google_service_account.service_account.email}"
   ]
@@ -300,6 +301,15 @@ resource "google_project_iam_binding" "invoker_binding" {
   members = ["serviceAccount:${google_service_account.cloudfunction_service.email}"]
   project = var.project_id
   role    = "roles/run.invoker"
+}
+
+resource "google_project_iam_binding" "pubsub_publisher_binding" {
+  project = var.project_id
+  role    = "roles/pubsub.publisher"
+
+  members = [
+    "serviceAccount:${google_service_account.service_account.email}"
+  ]
 }
 #resource "google_service_account_iam_member" "member_service" {
 #  service_account_id = google_service_account.cloudfunction_service.account_id
