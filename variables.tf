@@ -206,3 +206,12 @@ variable "scopes" {
   type        = list(string)
   #  default     = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write"]
 }
+
+variable "api_key" {
+  description = "Mailgun Api key"
+  type        = string
+}
+variable "mailgun_email" {
+  description = "mailgun email"
+  type        = string
+}
