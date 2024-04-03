@@ -1,8 +1,8 @@
 terraform {
   required_providers {
     google = {
-      source  = "hashicorp/google"
-      version = "4.51.0"
+      source = "hashicorp/google"
+#      version = "5.22.0"
     }
   }
 }
@@ -48,6 +48,7 @@ resource "google_service_networking_connection" "cloudsql_connection" {
   network                 = google_compute_network.vpc_network.id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
+  deletion_policy         = "ABANDON"
 }
 
 resource "google_compute_route" "default_route" {
@@ -128,18 +129,65 @@ resource "google_service_account" "service_account" {
   display_name = var.service_account_display_name
 }
 
-resource "google_compute_instance" "webapp_instance" {
+#resource "google_compute_instance" "webapp_instance" {
+#  name         = "${var.vpc_name}-webapp-instance"
+#  machine_type = var.machine_type
+#  zone         = var.zone
+#  tags         = ["my-vm"]
+#  boot_disk {
+#    initialize_params {
+#      image = var.custom_image
+#      size  = var.disk_size_gb
+#      type  = var.disk_type
+#    }
+#  }
+#  network_interface {
+#    network    = google_compute_network.vpc_network.name
+#    subnetwork = google_compute_subnetwork.webapp_subnet.name
+#
+#    access_config {
+#
+#    }
+#  }
+#
+#  metadata_startup_script = <<-EOF
+#      #!/bin/bash
+#
+#      > /opt/csye6225/application.properties
+#      echo "spring.datasource.url=jdbc:mysql://${google_sql_database_instance.sql_instance.private_ip_address}:3306/${var.dbname}?createDatabaseIfNotExist=true" >> /opt/csye6225/application.properties
+#      echo "spring.datasource.username=${var.username}" >> /opt/csye6225/application.properties
+#      echo "spring.datasource.password=${random_password.cloudsql_password.result}" >> /opt/csye6225/application.properties
+#      echo "spring.jpa.hibernate.ddl-auto=update" >> /opt/csye6225/application.properties
+#      echo "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect" >> /opt/csye6225/application.properties
+#      echo "spring.jackson.deserialization.fail-on-unknown-properties=true" >> /opt/csye6225/application.properties
+#      echo "projectId=dev-csye-6225-415001" >> /opt/csye6225/application.properties
+#      echo "topicId=verify_email >>/opt/csye6225/application.properties
+#  EOF
+#
+#  depends_on = [google_service_account.service_account]
+#
+#  service_account {
+#    email  = google_service_account.service_account.email
+#    scopes = var.scopes
+#  }
+#  allow_stopping_for_update = true
+#}
+
+
+resource "google_compute_region_instance_template" "webappinstance_template" {
   name         = "${var.vpc_name}-webapp-instance"
+#  zone         = var.zone
   machine_type = var.machine_type
-  zone         = var.zone
   tags         = ["my-vm"]
-  boot_disk {
-    initialize_params {
-      image = var.custom_image
-      size  = var.disk_size_gb
-      type  = var.disk_type
-    }
+
+  disk {
+
+    source_image = var.custom_image
+#    size  = var.disk_size_gb
+    type  = var.disk_type
+    boot  = true
   }
+
   network_interface {
     network    = google_compute_network.vpc_network.name
     subnetwork = google_compute_subnetwork.webapp_subnet.name
@@ -150,18 +198,18 @@ resource "google_compute_instance" "webapp_instance" {
   }
 
   metadata_startup_script = <<-EOF
-      #!/bin/bash
+        #!/bin/bash
 
-      > /opt/csye6225/application.properties
-      echo "spring.datasource.url=jdbc:mysql://${google_sql_database_instance.sql_instance.private_ip_address}:3306/${var.dbname}?createDatabaseIfNotExist=true" >> /opt/csye6225/application.properties
-      echo "spring.datasource.username=${var.username}" >> /opt/csye6225/application.properties
-      echo "spring.datasource.password=${random_password.cloudsql_password.result}" >> /opt/csye6225/application.properties
-      echo "spring.jpa.hibernate.ddl-auto=update" >> /opt/csye6225/application.properties
-      echo "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect" >> /opt/csye6225/application.properties
-      echo "spring.jackson.deserialization.fail-on-unknown-properties=true" >> /opt/csye6225/application.properties
-      echo "projectId=dev-csye-6225-415001" >> /opt/csye6225/application.properties
-      echo "topicId=verify_email >>/opt/csye6225/application.properties
-  EOF
+        > /opt/csye6225/application.properties
+        echo "spring.datasource.url=jdbc:mysql://${google_sql_database_instance.sql_instance.private_ip_address}:3306/${var.dbname}?createDatabaseIfNotExist=true" >> /opt/csye6225/application.properties
+        echo "spring.datasource.username=${var.username}" >> /opt/csye6225/application.properties
+        echo "spring.datasource.password=${random_password.cloudsql_password.result}" >> /opt/csye6225/application.properties
+        echo "spring.jpa.hibernate.ddl-auto=update" >> /opt/csye6225/application.properties
+        echo "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect" >> /opt/csye6225/application.properties
+        echo "spring.jackson.deserialization.fail-on-unknown-properties=true" >> /opt/csye6225/application.properties
+        echo "projectId=dev-csye-6225-415001" >> /opt/csye6225/application.properties
+        echo "topicId=verify_email >>/opt/csye6225/application.properties
+    EOF
 
   depends_on = [google_service_account.service_account]
 
@@ -169,8 +217,107 @@ resource "google_compute_instance" "webapp_instance" {
     email  = google_service_account.service_account.email
     scopes = var.scopes
   }
-  allow_stopping_for_update = true
+#  allow_stopping_for_update = true
 }
+
+resource "google_compute_health_check" "health_check" {
+  name                = var.health_check_name
+  check_interval_sec  = var.check_interval_sec
+  timeout_sec         = var.timeout_sec
+  healthy_threshold   = var.healthy_threshold
+  unhealthy_threshold = var.unhealthy_threshold
+
+  http_health_check {
+    request_path = var.request_path
+    port         = var.healthcheck_port
+  }
+}
+resource "google_compute_region_instance_group_manager" "instance_group_manager" {
+  base_instance_name = var.base_instance_name
+  name               = var.groupinstance_manager
+  region             = var.region
+  named_port {
+    name = var.namedport_name
+    port = var.namedport_port
+  }
+#  zone = var.zone
+    distribution_policy_zones  = ["us-central1-a", "us-central1-b"]
+  target_size = 1
+
+  version {
+    instance_template = google_compute_region_instance_template.webappinstance_template.self_link
+  }
+  auto_healing_policies {
+    health_check      = google_compute_health_check.health_check.id
+    initial_delay_sec = 150
+  }
+}
+
+resource "google_compute_region_autoscaler" "autoscaler" {
+  name   = var.autoscaler_name
+  region = var.region
+  target = google_compute_region_instance_group_manager.instance_group_manager.id
+
+  autoscaling_policy {
+    max_replicas    = var.max_replicas
+    min_replicas    = var.min_replicas
+    cooldown_period = var.cooldown_period
+
+    cpu_utilization {
+      target = var.cpu_utilization_target
+    }
+  }
+}
+
+
+resource "google_compute_target_https_proxy" "target_proxy" {
+  name    = var.target_proxy
+  url_map = google_compute_url_map.url_map.self_link
+  ssl_certificates = [google_compute_managed_ssl_certificate.lb_default_cert.id]
+}
+
+resource "google_compute_url_map" "url_map" {
+  name             = var.url_map
+  default_service  = google_compute_backend_service.backend_service.self_link
+}
+
+output "instance_group_url" {
+  value = google_compute_region_instance_group_manager.instance_group_manager.instance_group
+}
+
+resource "google_compute_backend_service" "backend_service" {
+  name          = var.backend_service
+  load_balancing_scheme = var.load_balancing_scheme
+  port_name     = var.backend_port_name
+  protocol      = var.backend_protocol
+  timeout_sec   = var.backend_timeout_sec
+  health_checks = [google_compute_health_check.health_check.id]
+  backend {
+    group = google_compute_region_instance_group_manager.instance_group_manager.instance_group
+    balancing_mode = var.backend_balancing_mode
+    capacity_scaler = 1.0
+  }
+}
+
+resource "google_compute_global_forwarding_rule" "webapp_forwarding_rule" {
+  name       = var.forwarding_rule_name
+  target     = google_compute_target_https_proxy.target_proxy.self_link
+  port_range = var.forwarding_rule_port_range
+  ip_address = google_compute_global_address.webapp_ip.address
+}
+
+resource "google_compute_managed_ssl_certificate" "lb_default_cert" {
+  name = var.lb_default_cert_name
+  type = var.lb_default_cert_type
+  managed {
+    domains = ["csye6225cloud.me"]
+  }
+}
+
+resource "google_compute_global_address" "webapp_ip" {
+  name = "webapp-global-ip1"
+}
+
 
 data "google_dns_managed_zone" "existing_zone" {
   name = var.zone_name
@@ -181,7 +328,7 @@ resource "google_dns_record_set" "a" {
   managed_zone = data.google_dns_managed_zone.existing_zone.name
   type         = var.record_type
   ttl          = var.ttl
-  rrdatas      = [google_compute_instance.webapp_instance.network_interface[0].access_config[0].nat_ip]
+  rrdatas      = [google_compute_global_address.webapp_ip.address]
 }
 
 resource "google_project_iam_binding" "logging_admin_binding" {
@@ -203,26 +350,25 @@ resource "google_project_iam_binding" "monitoring_metric_writer_binding" {
 }
 
 resource "google_pubsub_topic" "pubtopic" {
-  name = "verify_email"
-
-  message_retention_duration = "604800s"
+  name = var.pubtopicname
+  message_retention_duration = var.message_retention_duration
 }
 
 resource "google_pubsub_subscription" "pusub" {
-  name                 = "pubsub-subscription"
+  name                 = var.pubsub_subscription_name
   topic                = google_pubsub_topic.pubtopic.id
-  ack_deadline_seconds = 20
+  ack_deadline_seconds = var.ack_deadline_seconds
 }
 resource "google_storage_bucket" "cloud_bucket" {
-  name                        = "abcxyz7686"
-  location                    = "US"
-  uniform_bucket_level_access = false
+  name                        = var.cloud_bucket_name
+  location                    = var.cloud_location
+  uniform_bucket_level_access = var.uniform_bucket_level_access
 }
 
 resource "google_storage_bucket_object" "archive" {
   name   = "function.jar"
   bucket = google_storage_bucket.cloud_bucket.name
-  source = "/Users/vamsidhar/Documents/serverless1/function-source.zip"
+  source = var.bucket_archive_source
 }
 
 resource "google_cloudfunctions2_function" "cloud_function" {
@@ -232,8 +378,8 @@ resource "google_cloudfunctions2_function" "cloud_function" {
 
   depends_on = [google_vpc_access_connector.serverlessvpc, google_sql_database_instance.sql_instance]
   build_config {
-    runtime     = "java17"
-    entry_point = "gcfv2pubsub.PubSubFunction"
+    runtime     = var.runtime
+    entry_point = var.cloud_function_entrypoint
 
     source {
       storage_source {
@@ -244,11 +390,11 @@ resource "google_cloudfunctions2_function" "cloud_function" {
   }
 
   service_config {
-    min_instance_count               = 0
-    max_instance_count               = 1
-    available_memory                 = "2Gi"
-    max_instance_request_concurrency = 10
-    available_cpu                    = "2"
+    min_instance_count               = var.min_instance_count
+    max_instance_count               = var.max_instance_count
+    available_memory                 = var.available_memory
+    max_instance_request_concurrency = var.max_instance_request_concurrency
+    available_cpu                    = var.available_cpu
     service_account_email            = google_service_account.cloudfunction_service.email
     environment_variables = {
       dbUrl = "jdbc:mysql://${google_sql_database_instance.sql_instance.private_ip_address}:3306/webapp?createDatabaseIfNotExist=true"
@@ -257,39 +403,40 @@ resource "google_cloudfunctions2_function" "cloud_function" {
       dbPass        = random_password.cloudsql_password.result
       mailgun_email = var.mailgun_email
       api_key       = var.api_key
+      verificationBaseUrl = var.verificationBaseUrl
     }
 
     vpc_connector                 = "projects/${var.project_id}/locations/${var.region}/connectors/${google_vpc_access_connector.serverlessvpc.name}"
-    vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+    vpc_connector_egress_settings = var.vpc_connector_egress_settings
 
   }
   #  vpc
   event_trigger {
 
     trigger_region = var.region
-    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
+    event_type     = var.event_type
     pubsub_topic   = google_pubsub_topic.pubtopic.id
-    retry_policy   = "RETRY_POLICY_DO_NOT_RETRY"
+    retry_policy   = var.retry_policy
   }
 }
 
 resource "google_vpc_access_connector" "serverlessvpc" {
   project       = var.project_id
-  name          = "vpcconnectorx"
+  name          = var.serverlessvpc_name
   region        = var.region
   network       = google_compute_network.vpc_network.name
-  ip_cidr_range = "10.0.8.0/28"
+  ip_cidr_range = var.ip_cidr_range
 }
 
 
 resource "google_service_account" "cloudfunction_service" {
-  account_id   = "cloud-sa"
-  display_name = "cloud service account"
+  account_id   = var.cloudfunction_service_account_id
+  display_name = var.cloudfunction_service_display_anme
 }
 
 resource "google_pubsub_topic_iam_binding" "pubsub_binding" {
   project = var.project_id
-  role    = "roles/pubsub.publisher"
+  role    = var.pubsub_binding_role
   topic   = google_pubsub_topic.pubtopic.name
   members = [
     "serviceAccount:${google_service_account.service_account.email}"
@@ -300,13 +447,12 @@ resource "google_pubsub_topic_iam_binding" "pubsub_binding" {
 resource "google_project_iam_binding" "invoker_binding" {
   members = ["serviceAccount:${google_service_account.cloudfunction_service.email}"]
   project = var.project_id
-  role    = "roles/run.invoker"
+  role    = var.invoker_binding_role
 }
 
 resource "google_project_iam_binding" "pubsub_publisher_binding" {
   project = var.project_id
-  role    = "roles/pubsub.publisher"
-
+  role    = var.pubsub_publisher_binding_role
   members = [
     "serviceAccount:${google_service_account.service_account.email}"
   ]
@@ -320,7 +466,9 @@ resource "google_project_iam_binding" "pubsub_publisher_binding" {
 
 
 
-
+output "nat_ip_value" {
+  value = google_compute_region_instance_template.webappinstance_template.network_interface[0].access_config[0].nat_ip
+}
 
 
 
