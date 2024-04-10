@@ -436,3 +436,46 @@ variable "pubsub_publisher_binding_role" {
   description = "pubsub publisher binding role"
   type = string
 }
+
+variable "vm_crypto_key_name" {
+  description = "Name for the VM crypto key"
+  type        = string
+
+}
+
+variable "cloudsql_crypto_key_name" {
+  description = "Name for the CloudSQL crypto key"
+  type        = string
+}
+
+variable "storage_crypto_key_name" {
+  description = "Name for the storage crypto key"
+  type        = string
+}
+variable "crypto_key_purpose" {
+  description = "Purpose for the crypto key"
+  type        = string
+  default     = "ENCRYPT_DECRYPT"
+}
+
+variable "crypto_key_rotation_period" {
+  description = "Rotation period for the crypto key"
+  type        = string
+  default     = "2592000s" # Rotation period of 30 days
+}
+
+variable "vm_crypto_key_role" {
+  description = "Role for the VM crypto key IAM binding"
+  type        = string
+}
+
+variable "cloudsql_crypto_key_role" {
+  description = "Role for the CloudSQL crypto key IAM binding"
+  type        = string
+}
+
+variable "storage_crypto_key_role" {
+  description = "Role for the storage crypto key IAM binding"
+  type        = string
+}
+
