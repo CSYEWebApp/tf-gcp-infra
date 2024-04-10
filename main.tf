@@ -2,7 +2,7 @@ terraform {
   required_providers {
     google = {
       source = "hashicorp/google"
-#      version = "5.22.0"
+      #      version = "5.22.0"
     }
   }
 }
@@ -11,6 +11,9 @@ provider "google" {
   project = var.project_id
   region  = var.region
   zone    = var.zone
+}
+
+data "google_project" "project_number"{
 }
 
 resource "google_compute_network" "vpc_network" {
@@ -84,6 +87,12 @@ resource "google_compute_firewall" "webapp_deny_rule" {
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["my-vm"]
 }
+resource "google_project_service_identity" "gcp_sa_cloud_sql" {
+  provider = google-beta
+  project = var.project_id
+  service  = "sqladmin.googleapis.com"
+}
+
 
 resource "google_sql_database_instance" "sql_instance" {
   name                = var.sqlinstancename
@@ -104,6 +113,7 @@ resource "google_sql_database_instance" "sql_instance" {
       enabled            = var.backup_configuration_enabled
     }
   }
+  encryption_key_name = google_kms_crypto_key.cloudsql_crypto_key.id
   depends_on = [google_service_networking_connection.cloudsql_connection]
 }
 
@@ -122,11 +132,60 @@ resource "google_sql_user" "sql_user" {
 resource "random_password" "cloudsql_password" {
   length  = 16
   special = true
+  override_special = "-@&4"
 }
 
 resource "google_service_account" "service_account" {
   account_id   = var.service_account_account_id
   display_name = var.service_account_display_name
+}
+
+# Create Key Ring for the region
+resource "google_kms_key_ring" "my_key_ring" {
+  name     = "my-key-ring4"
+  location = var.region
+}
+
+# Create Encryption Key for Virtual Machines
+resource "google_kms_crypto_key" "vm_crypto_key" {
+  name       = var.vm_crypto_key_name
+  key_ring   = google_kms_key_ring.my_key_ring.id
+  purpose    = var.crypto_key_purpose
+  rotation_period = var.crypto_key_rotation_period# Rotation period of 30 days
+}
+
+# Create Encryption Key for CloudSQL Instances
+resource "google_kms_crypto_key" "cloudsql_crypto_key" {
+  name       = var.cloudsql_crypto_key_name
+  key_ring   = google_kms_key_ring.my_key_ring.id
+  purpose    = var.crypto_key_purpose
+  rotation_period = var.crypto_key_rotation_period # Rotation period of 30 days
+}
+
+# Create Encryption Key for Cloud Storage Buckets
+resource "google_kms_crypto_key" "storage_crypto_key" {
+  name       = var.storage_crypto_key_name
+  key_ring   = google_kms_key_ring.my_key_ring.id
+  purpose    = var.crypto_key_purpose
+  rotation_period = var.crypto_key_rotation_period # Rotation period of 30 days
+}
+
+resource "google_kms_crypto_key_iam_binding" "cloudsql_crypto_key_binding" {
+  crypto_key_id = google_kms_crypto_key.cloudsql_crypto_key.id
+  role          = var.cloudsql_crypto_key_role
+  members       = ["serviceAccount:${google_project_service_identity.gcp_sa_cloud_sql.email}"]
+}
+
+resource "google_kms_crypto_key_iam_binding" "storage_crypto_key_binding" {
+  crypto_key_id = google_kms_crypto_key.storage_crypto_key.id
+  role          = var.storage_crypto_key_role
+  members       = ["serviceAccount:service-${data.google_project.project_number.number}@gs-project-accounts.iam.gserviceaccount.com"]
+}
+
+resource "google_kms_crypto_key_iam_binding" "vm_crypto_key_binding" {
+  crypto_key_id = google_kms_crypto_key.vm_crypto_key.id
+  role          = var.vm_crypto_key_role
+  members       = ["serviceAccount:service-${data.google_project.project_number.number}@compute-system.iam.gserviceaccount.com"]
 }
 
 #resource "google_compute_instance" "webapp_instance" {
@@ -176,16 +235,20 @@ resource "google_service_account" "service_account" {
 
 resource "google_compute_region_instance_template" "webappinstance_template" {
   name         = "${var.vpc_name}-webapp-instance"
-#  zone         = var.zone
+  #  zone         = var.zone
   machine_type = var.machine_type
   tags         = ["my-vm"]
 
   disk {
 
     source_image = var.custom_image
-#    size  = var.disk_size_gb
+    #    size  = var.disk_size_gb
     type  = var.disk_type
     boot  = true
+    disk_encryption_key {
+      #      kms_key_name = google_kms_crypto_key.vm_crypto_key.id
+      kms_key_self_link = google_kms_crypto_key.vm_crypto_key.id
+    }
   }
 
   network_interface {
@@ -208,7 +271,7 @@ resource "google_compute_region_instance_template" "webappinstance_template" {
         echo "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect" >> /opt/csye6225/application.properties
         echo "spring.jackson.deserialization.fail-on-unknown-properties=true" >> /opt/csye6225/application.properties
         echo "projectId=dev-csye-6225-415001" >> /opt/csye6225/application.properties
-        echo "topicId=verify_email >>/opt/csye6225/application.properties
+        echo "topicId=verify_email" >>/opt/csye6225/application.properties
     EOF
 
   depends_on = [google_service_account.service_account]
@@ -217,7 +280,7 @@ resource "google_compute_region_instance_template" "webappinstance_template" {
     email  = google_service_account.service_account.email
     scopes = var.scopes
   }
-#  allow_stopping_for_update = true
+  #  allow_stopping_for_update = true
 }
 
 resource "google_compute_health_check" "health_check" {
@@ -240,8 +303,8 @@ resource "google_compute_region_instance_group_manager" "instance_group_manager"
     name = var.namedport_name
     port = var.namedport_port
   }
-#  zone = var.zone
-    distribution_policy_zones  = ["us-central1-a", "us-central1-b"]
+  #  zone = var.zone
+  distribution_policy_zones  = ["us-central1-a", "us-central1-b"]
   target_size = 1
 
   version {
@@ -363,6 +426,10 @@ resource "google_storage_bucket" "cloud_bucket" {
   name                        = var.cloud_bucket_name
   location                    = var.cloud_location
   uniform_bucket_level_access = var.uniform_bucket_level_access
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.storage_crypto_key.id
+  }
+  depends_on = [google_kms_crypto_key_iam_binding.storage_crypto_key_binding]
 }
 
 resource "google_storage_bucket_object" "archive" {
